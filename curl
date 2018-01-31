@@ -325,16 +325,36 @@ size_t im_download_data(void *ptr, size_t size, size_t nmemb, void *stream)
 }
 
 int im_progress_func(char *progress_data,
-                     double t, /* dltotal */
-                     double d, /* dlnow */
+                     double dltotal, /* dltotal */
+                     double dlnow, /* dlnow */
                      double ultotal,
                      double ulnow)
 {
-	int per = (int)(d*100.0/t);
-	long dlen = (long) (d);
-	long tlen = (long) (t);
 
-  return 0;
+    double curtime = 0;
+    double contentlen =0;
+
+    curl_easy_getinfo(curl, CURLINFO_TOTAL_TIME, &curtime);
+    curl_easy_getinfo(curl, CURLINFO_CONTENT_LENGTH_DOWNLOAD, &contentlen);
+
+	int per = (int)(d*100.0/t);
+	long dlen = (long) (dlnow);
+	long tlen = (long) (dltotal);
+    fprintf(stdout,"DOWNLOAD %"CURL_FORMAT_CURL_OFF_T" OF %"CURL_FORMAT_CURL_OFF_T\
+            " , SPEED %d , %g%%",dlen, tlen, speed, per);
+    return 0;
+}
+
+int get_local_size(const char* localpath)
+{
+    struct stat file_info;
+
+    if(stat(localpath, &file_info) == 0)
+	{
+		return  file_info.st_size;
+	}
+
+    return -1;
 }
 
 int im_curl_download_back(CURL *curlhandle, char *url, void *data)
@@ -343,7 +363,7 @@ int im_curl_download_back(CURL *curlhandle, char *url, void *data)
 	FILE *file = NULL;
 	long retcode = 0;
 	int err = 0;
-	struct stat file_info;
+
 	curl_off_t local_file_len = -1 ;
 	int use_resume = 0;
 	char *local_url = NULL;
@@ -364,12 +384,10 @@ int im_curl_download_back(CURL *curlhandle, char *url, void *data)
 
 
 	local_url = (char *)data;
-	if(stat(local_url, &file_info) == 0)
-	{
-		local_file_len =  file_info.st_size;
-		use_resume	= 1;
-	}
-
+	if((local_file_len =  get_local_size(local_url))>0)
+    {
+        use_resume	= 1;
+    }
 
 	file = fopen(local_url, "ab+");
 	if (file == NULL)
@@ -393,7 +411,7 @@ int im_curl_download_back(CURL *curlhandle, char *url, void *data)
 	curl_easy_setopt(curlhandle, CURLOPT_PROGRESSFUNCTION, im_progress_func);
 	curl_easy_setopt(curlhandle, CURLOPT_PROGRESSDATA, "*");
 
-	curl_easy_setopt(curlhandle, CURLOPT_VERBOSE, 0L);
+	curl_easy_setopt(curlhandle, CURLOPT_VERBOSE, 1L);
 
 	err = im_curl_perform(curlhandle);
 
@@ -494,6 +512,39 @@ int test_get_content_length(char* purl)
    // my_get_contentLength(&myfilesize,purl);
 }
 
-int test_
+int test_download_file(const char* purl, const char* localpath)
+{
+    CURL *curlhandle = NULL;			 //
+	int res = -1;
+	char url[100] = {0};
+
+	strcpy(url, purl);
+
+	res = im_curl_init(&curlhandle);
+	if (res < 0)
+	{
+		_LOG("im_curl_init fail\n");
+		return -1;
+	}
+
+	res = im_curl_download_back(curlhandle, url, localpath);
+	if (res < 0)
+	{
+		_LOG("im_curl_get fail\n");
+		return -1;
+	}
+
+	res = im_curl_clean(curlhandle);
+	if (res < 0)
+	{
+		_LOG("im_curl_clean fail\n");
+		return -1;
+	}
+
+	return 0;
+}
+
+
+
 
 
