@@ -1,214 +1,15 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <unistd.h>
+#include "sqm_curl.h"
 #include <string.h>
+#include <unistd.h>
 #include <sys/stat.h>
-#include <errno.h>
-#include "my_curl.h"
 
-// write to file
-size_t my_write_func(void *ptr, size_t size, size_t nmemb, void *stream)
+
+static size_t my_write_func(void *ptr, size_t size, size_t nmemb, void *stream)
 {
   return fwrite(ptr, size, nmemb, (FILE*)stream);
 }
-// read to file
-size_t my_read_func(void *ptr, size_t size, size_t nmemb, void *stream)
-{
-  return fread(ptr, size, nmemb, (FILE*)stream);
-}
 
-int im_curl_init(CURL **curlhandle)
-{
-	CURLcode res;
-
-	if (curlhandle == NULL)
-	{
-		_LOG("PARAM ERROR\n");
-		return -1;
-	}
-
-	res = curl_global_init(CURL_GLOBAL_ALL);
-	if (res != CURLE_OK)
-	{
-		_LOG("curl_global_init fail:%s", curl_easy_strerror(res));
-		return -1;
-	}
-
-	*curlhandle = curl_easy_init();
-	if (*curlhandle == NULL)
-	{
-		_LOG("curl_easy_init error\n");
-		return -1;
-	}
-
-	return res;
-}
-
-int im_curl_clean(CURL *curlhandle)
-{
-	if (curlhandle == NULL)
-	{
-		_LOG("PARAM ERROR");
-		return -1;
-	}
-
-	curl_easy_cleanup(curlhandle);
-	curl_global_cleanup();
-}
-
-int im_curl_perform(CURL *curlhandle)
-{
-	CURLcode res;
-	long retcode = 0;
-
-	if (curlhandle == NULL)
-	{
-		_LOG("PARAM ERROR");
-		return -1;
-	}
-
-	res = curl_easy_perform(curlhandle);
-	if (res != CURLE_OK)
-	{
-		  _LOG("%s\n", curl_easy_strerror(res));
-		  return -1;
-	}
-
-	res = curl_easy_getinfo(curlhandle, CURLINFO_RESPONSE_CODE , &retcode);
-	if ((res == CURLE_OK)&& ((retcode == 200) || (206 == retcode)))//  206 resume download
-	{
-		_LOG("download OK retcode:%d", retcode);
-	}
-	else
-	{
-		_LOG("fail %s  retcode:%d\n", curl_easy_strerror(res), retcode);
-		return -1;
-	}
-
-	return 0;
-
-}
-
-int im_curl_option(CURL *curlhandle, char *url, void *data, pfunc_option im_option)
-{
-	return im_option(curlhandle, url, data);
-}
-
-
-int im_construct_header(struct curl_slist **headers, pfunc_header im_header_func)
-{
-	return im_header_func(headers);
-}
-
-
-int im_curl_get_back(CURL *curlhandle, char *url, void *data)
-{
-	int ret = -1;
-
-	if (!curlhandle || !url)
-	{
-		_LOG("Bad param!!!");
-		return -1;
-	}
-
-	curl_easy_setopt(curlhandle, CURLOPT_URL, url);
-	curl_easy_setopt(curlhandle, CURLOPT_CONNECTTIMEOUT, TIMEOUT);  // …Ë÷√¡¨Ω”≥¨ ±£¨µ•Œª√Î
-	curl_easy_setopt(curlhandle, CURLOPT_USERPWD, "zry:123456");
-
-	curl_easy_setopt(curlhandle, CURLOPT_NOPROGRESS, 1L);
-	curl_easy_setopt(curlhandle, CURLOPT_VERBOSE, 1L);
-
-	ret = im_curl_perform(curlhandle);
-
-
-	return ret;
-
-}
-
-int im_curl_post_back(CURL *curlhandle, char *url, void *data)
-{
-	char *postdata = NULL;
-	int ret = -1;
-
-	if (!curlhandle || !url || !data)
-	{
-		_LOG("Bad param!!!");
-		return -1;
-	}
-
-	postdata = (char *)data;
-
-	curl_easy_setopt(curlhandle, CURLOPT_URL, url);
-	curl_easy_setopt(curlhandle, CURLOPT_CONNECTTIMEOUT, TIMEOUT);  //
-	curl_easy_setopt(curlhandle, CURLOPT_USERPWD, "zry:123456");
-
-	curl_easy_setopt(curlhandle, CURLOPT_NOPROGRESS, 1L);
-	curl_easy_setopt(curlhandle, CURLOPT_VERBOSE, 1L);
-
-	curl_easy_setopt(curlhandle, CURLOPT_POSTFIELDS, postdata);
-	//	curl_easy_setopt(curl, CURLOPT_POST, 1L);
-
-	ret = im_curl_perform(curlhandle);
-
-	return ret;
-
-}
-
-int im_curl_head_back(CURL *curlhandle, char *url, void *data)
-{
-	int ret = -1;
-	if (!curlhandle || !url)
-	{
-		_LOG("Bad param!!!");
-		return -1;
-	}
-
-	curl_easy_setopt(curlhandle, CURLOPT_URL, url);
-	curl_easy_setopt(curlhandle, CURLOPT_HEADER, NULL);
-	curl_easy_setopt(curlhandle, CURLOPT_NOBODY, 1L);
-	curl_easy_setopt(curlhandle, CURLOPT_NOPROGRESS, 1L);
-	curl_easy_setopt(curlhandle, CURLOPT_VERBOSE, 1L);
-	ret = im_curl_perform(curlhandle);
-
-	return ret;
-}
-
-
-int im_header_back(struct curl_slist **headers)
-{
-	*headers = curl_slist_append(*headers, "Hey-server-hey: how are you?");
-	*headers = curl_slist_append(*headers, "X-silly-content: haha");
-	return 0;
-}
-
-int im_customer_header_back(CURL *curlhandle, char *url, void *data)
-{
-	struct curl_slist *headers = NULL;
-	int ret = -1;
-	pfunc_header p_headfunc = (pfunc_header) data;
-
-	if (!curlhandle || !url || !data)
-	{
-		_LOG("Bad param!!!");
-		return -1;
-	}
-
-	im_construct_header(&headers, p_headfunc);
-
-	curl_easy_setopt(curlhandle, CURLOPT_URL, url);
-	curl_easy_setopt(curlhandle, CURLOPT_HTTPHEADER, headers);
-	curl_easy_setopt(curlhandle, CURLOPT_NOPROGRESS, 1L);
-	curl_easy_setopt(curlhandle, CURLOPT_VERBOSE, 1L);
-
-	ret = im_curl_perform(curlhandle);
-
-	curl_slist_free_all(headers); /* free the header list */
-
-	return ret;
-}
-
-
-size_t im_get_contentlength(void *ptr, size_t size, size_t nmemb, void *stream)
+static size_t my_readheader_func(void *ptr, size_t size, size_t nmemb, void *stream)
 {
 	int ret = -1;
 	long len = 0;
@@ -221,83 +22,9 @@ size_t im_get_contentlength(void *ptr, size_t size, size_t nmemb, void *stream)
 	return size * nmemb;
 }
 
-size_t my_get_contentLength(double *filesize, char *url)
-{
-
-    int err = 0;
-	CURL *curlhandle = NULL;
-	CURLcode res;
-
-	err = im_curl_init(&curlhandle);
-	if (err < 0)
-	{
-		_LOG("im_curl_init err");
-		return err;
-	}
-
-    curl_easy_setopt(curlhandle, CURLOPT_URL, url);
-    curl_easy_setopt(curlhandle, CURLOPT_HEADER, 1L);
-    curl_easy_setopt(curlhandle, CURLOPT_NOBODY, 1L);
-
-    res = curl_easy_perform(curlhandle);
-    if (res == CURLE_OK)
-    {
-        curl_easy_getinfo(curlhandle, CURLINFO_CONTENT_LENGTH_DOWNLOAD, filesize);
-        _LOG("my filesize: %f", *filesize);
-    }
-    else
-    {
-        _LOG("%s\n", curl_easy_strerror(res));
-        err = -1;
-    }
-
-    im_curl_clean(curlhandle);
-    return err;
-}
-
-int im_get_remote_file_len_back(long *filesize, char *url)
-{
-	int err = 0;
-	CURL *curlhandle = NULL;
-	CURLcode res;
-
-	err = im_curl_init(&curlhandle);
-	if (err < 0)
-	{
-		_LOG("im_curl_init err");
-		return err;
-	}
-	curl_easy_setopt(curlhandle, CURLOPT_URL, url);
-	curl_easy_setopt(curlhandle, CURLOPT_NOBODY, 1L);
-	curl_easy_setopt(curlhandle, CURLOPT_CONNECTTIMEOUT, TIMEOUT);  // …Ë÷√¡¨Ω”≥¨ ±£¨µ•Œª√Î
-
-	curl_easy_setopt(curlhandle, CURLOPT_HEADERFUNCTION, im_get_contentlength);
-	curl_easy_setopt(curlhandle, CURLOPT_HEADERDATA, filesize);
-	curl_easy_setopt(curlhandle, CURLOPT_NOPROGRESS, 1L);
-	curl_easy_setopt(curlhandle, CURLOPT_VERBOSE, 0L);
-
-	res = curl_easy_perform(curlhandle);
-	if (res != CURLE_OK)
-	{
-		  _LOG("%s\n", curl_easy_strerror(res));
-		  err = -1;
-	}
-	//_LOG("im filesize:%d", *filesize);
-
-	im_curl_clean(curlhandle);
-	return err;
-}
-
-size_t my_download_data(void *ptr, size_t size, size_t nmemb, void *stream)
-{
-	int written = fwrite(ptr, size, nmemb, (FILE *)stream);
-	//_LOG("%ld",written);
-	return written;
-}
-
-int my_progress_func(void *clientp,
-                     curl_off_t  dltotal, /* dltotal */
-                     curl_off_t  dlnow, /* dlnow */
+static int my_xferinfo_func(void *clientp,
+                     curl_off_t  dltotal,
+                     curl_off_t  dlnow,
                      curl_off_t  ultotal,
                      curl_off_t  ulnow)
 {
@@ -317,16 +44,16 @@ int my_progress_func(void *clientp,
     if((curtime - pinfo->lasttime) >= MINIMAL_PROGRESS_FUNCTIONALITY_INTERVAL)
     {
         pinfo->lasttime = curtime;
-        fprintf(stderr, "\nœ¬‘ÿ¿˙ ±: %f, \n", curtime);
+        fprintf(stderr, "\n‰∏ãËΩΩÂéÜÊó∂: %f, \n", curtime);
 
-        fprintf(stderr,"“—œ¬‘ÿ %"CURL_FORMAT_CURL_OFF_T", ◊‹¥Û–° %"CURL_FORMAT_CURL_OFF_T\
-                " , ÀŸ∂» %.2fBytes/s, Ω¯∂» %g%%\n",dlnow, dltotal, speed, per);
+        fprintf(stderr,"Â∑≤‰∏ãËΩΩ %"CURL_FORMAT_CURL_OFF_T", ÊÄªÂ§ßÂ∞è %"CURL_FORMAT_CURL_OFF_T\
+                " , ÈÄüÂ∫¶ %.2fBytes/s, ËøõÂ∫¶ %g%%\n",dlnow, dltotal, speed, per);
     }
 
     return 0;
 }
 
-int my_get_localsize(const char* localpath)
+static int get_localsize(const char* localpath)
 {
     struct stat file_info;
 
@@ -338,213 +65,139 @@ int my_get_localsize(const char* localpath)
     return -1;
 }
 
-int my_curl_download_back(CURL *curlhandle, char *url, void *data)
+int sqm_curl_init(void)
 {
-	CURLcode res;			//∂®“ÂCURLcode¿‡–Õµƒ±‰¡ø£¨±£¥Ê∑µªÿ◊¥Ã¨¬Î
-	FILE *file = NULL;
-	long retcode = 0;
-	int err = 0;
-    struct progressinfo progressstruct;
+	CURLcode res;
 
-	curl_off_t local_file_len = -1 ;
-	int use_resume = 0;
-	char *local_url = NULL;
-	long filesize;
+	res = curl_global_init(CURL_GLOBAL_ALL);
 
-	if(!curlhandle || !url || !data)
+	if (res != CURLE_OK)
 	{
-		_LOG("Bad argument");
+		_LOG("curl_global_init fail:%s", curl_easy_strerror(res));
 		return -1;
 	}
 
+	return res;
+}
 
-	//err = im_curl_init(&curlhandle);
+void sqm_curl_clean(void)
+{
+	curl_global_cleanup();
+}
 
-	local_url = (char *)data;
-	if((local_file_len =  my_get_localsize(local_url))>0)
+int sqm_filedownload(const char *requestURL, const char *saveto, \
+                     const char *user, const char *pwd, \
+                     pfunc_xferinfo xferinfo_callback, void* xinfer_data)
+{
+	CURLcode res;
+
+    CURL *easy_handle = NULL;
+    FILE *fp = NULL;
+    char filepath[120] = {0};
+
+    //curl easy ÂàùÂßãÂåñ
+    easy_handle = curl_easy_init();
+
+
+    if ( NULL == easy_handle )
     {
-        use_resume	= 1;
-    }
 
-	file = fopen(local_url, "ab+");
-	if (file == NULL)
-	{
-		_LOG("open file %s fail", local_url);
-		err = -1;
-		goto openfile_err;
-	}
-
-	curl_easy_setopt(curlhandle, CURLOPT_URL, url);
-	curl_easy_setopt(curlhandle, CURLOPT_CONNECTTIMEOUT, TIMEOUT);  // …Ë÷√¡¨Ω”≥¨ ±£¨µ•Œª√Î
-
-	// …Ë÷√Œƒº˛–¯¥´µƒŒª÷√∏¯libcurl
-	curl_easy_setopt(curlhandle, CURLOPT_RESUME_FROM_LARGE, use_resume?local_file_len:0);
-	curl_easy_setopt(curlhandle, CURLOPT_NOPROGRESS, 1L);
-
-	curl_easy_setopt(curlhandle, CURLOPT_WRITEDATA, file);
-	curl_easy_setopt(curlhandle, CURLOPT_WRITEFUNCTION, my_download_data);
-
-	curl_easy_setopt(curlhandle, CURLOPT_HEADERFUNCTION, im_get_contentlength);
-	curl_easy_setopt(curlhandle, CURLOPT_HEADERDATA, &filesize);
-
-	//∏˙◊Ÿœ¬‘ÿΩ¯∂»
-	curl_easy_setopt(curlhandle, CURLOPT_NOPROGRESS, 0L);
-	curl_easy_setopt(curlhandle, CURLOPT_XFERINFOFUNCTION, my_progress_func);
-    progressstruct.curl = curlhandle;
-    progressstruct.lasttime = 0;
-	curl_easy_setopt(curlhandle, CURLOPT_XFERINFODATA, &progressstruct);
-
-	//curl_easy_setopt(curlhandle, CURLOPT_VERBOSE, 1L);
-
-	err = im_curl_perform(curlhandle);
-
-	if(err == CURLM_OK)
-    {
-        fprintf(stderr, "\n◊‹”√ ±: %f, \n", progressstruct.lasttime);
-
-        fprintf(stderr,"“—œ¬‘ÿ %d, ◊‹¥Û–° %d , ∆Ωæ˘ÀŸ∂» %.2fBytes/s, Ω¯∂» 100%%\n",\
-                filesize, filesize, filesize/progressstruct.lasttime);
-    }
-
-out:
-		fclose(file);
-openfile_err:
-		//im_curl_clean(curlhandle);
-
-	return err;
-}
-
-
-size_t im_update_data(void *ptr, size_t size, size_t nmemb, void *stream)
-{
-	int n = 0;
-
-	n = fread((char *)ptr, size, nmemb, (FILE *)stream);
-	//printf("%s ptr=%s\n",__func__, (char *)ptr);
-	return n;
-}
-
-int im_curl_upload_back(CURL *curlhandle, char *url, void *data)
-{
-	int ret = 0;
-	char *local_url = NULL;
-	FILE *file = NULL;
-
-	if (!curlhandle || !url || !data)
-	{
-		_LOG("Bad param!!!");
-		return -1;
-	}
-
-	local_url = (char *)data;
-	file = fopen(local_url, "r");
-	if (file == NULL)
-	{
-		_LOG("fopen error:%s", local_url);
-		return -1;
-	}
-
-	curl_easy_setopt(curlhandle, CURLOPT_URL, url);
-
-	curl_easy_setopt(curlhandle, CURLOPT_READFUNCTION, im_update_data);
-	curl_easy_setopt(curlhandle, CURLOPT_READDATA, file);
-
-	curl_easy_setopt(curlhandle, CURLOPT_UPLOAD, 1L);
-
-	curl_easy_setopt(curlhandle, CURLOPT_NOPROGRESS, 1L);
-	curl_easy_setopt(curlhandle, CURLOPT_VERBOSE, 1L);
-
-	ret = im_curl_perform(curlhandle);
-	fclose(file);
-
-	return ret;
-
-}
-
-int test(char *purl)
-{
-	CURL *curlhandle = NULL;			 //∂®“ÂCURL¿‡–Õµƒ÷∏’Î
-	int res = -1;
-	char url[100] = {0};
-
-	strcpy(url, purl);
-
-	res = im_curl_init(&curlhandle);
-	if (res < 0)
-	{
-		_LOG("im_curl_init fail\n");
-		return -1;
-	}
-
-	res = im_curl_get_back(curlhandle, url, NULL);
-	if (res < 0)
-	{
-		_LOG("im_curl_get fail\n");
-		return -1;
-	}
-
-	res = im_curl_clean(curlhandle);
-	if (res < 0)
-	{
-		_LOG("im_curl_clean fail\n");
-		return -1;
-	}
-
-	return 0;
-}
-
-int test_get_content_length(char* purl)
-{
-    size_t filesize = 0;
-
-    im_get_remote_file_len_back(&filesize,purl);
-   // my_get_contentLength(&myfilesize,purl);
-}
-
-int test_download_file(const char* purl, const char* localpath)
-{
-    CURL *curlhandle = NULL;			 //
-	int res = -1;
-	char url[100] = {0};
-
-	strcpy(url, purl);
-
-	res = im_curl_init(&curlhandle);
-	if (res < 0)
-	{
-		_LOG("im_curl_init fail\n");
-		return -1;
-	}
-    size_t filesize = 0;
-    size_t localsize = 0;
-    localsize = my_get_localsize(localpath);
-    im_get_remote_file_len_back(&filesize,purl);
-
-    if (filesize==0)
-    {
-        _LOG("remote file size zero");
+        _LOG("curl_easy_init error");
         return -1;
     }
 
-    if (filesize == localsize)
+    if(saveto == NULL)
+
     {
-        _LOG("file already exist %ld %ld");
-        return -2;
+        strcpy(filepath,"file downloaded");
+    }
+    else
+    {
+            //_LOG("%s", saveto);
+        strcpy(filepath, saveto);
     }
 
-	res = my_curl_download_back(curlhandle, url, localpath);
-	if (res < 0)
+    fp = fopen(filepath, "ab+");
+
+	if (fp == NULL)
 	{
-		_LOG("my_curl_download_back fail\n");
+		_LOG("open file \"%s\" fail", filepath);
+		fclose(fp);
 		return -1;
 	}
 
-	res = im_curl_clean(curlhandle);
-	if (res < 0)
+    struct progressinfo progressstruct;
+
+    //Êñ≠ÁÇπÁª≠‰º†
+    int use_resume = 0;
+	curl_off_t local_file_len = get_localsize(filepath);
+	if(local_file_len > 0)
+    {
+        use_resume	= 1;
+    }
+   // _LOG("%ld",local_file_len);
+
+
+	curl_easy_setopt(easy_handle, CURLOPT_URL, requestURL);
+	curl_easy_setopt(easy_handle, CURLOPT_CONNECTTIMEOUT, TIMEOUT);
+
+	if(user!=NULL && pwd!=NULL)
+    {
+        char userpwd[120];
+        strcpy(userpwd, user);
+		strcat(userpwd,":");
+        strcat(userpwd, pwd);
+        curl_easy_setopt(easy_handle, CURLOPT_USERPWD, userpwd);
+        //_LOG("password:  %s", userpwd);
+    }
+
+	//curl_easy_setopt(easy_handle, CURLOPT_RESUME_FROM_LARGE, use_resume?local_file_len:0);
+
+	size_t filesize = 0;
+	curl_easy_setopt(easy_handle, CURLOPT_HEADERFUNCTION, my_readheader_func);
+	curl_easy_setopt(easy_handle, CURLOPT_HEADERDATA, &filesize);
+
+	curl_easy_setopt(easy_handle, CURLOPT_WRITEDATA, fp);
+	curl_easy_setopt(easy_handle, CURLOPT_WRITEFUNCTION, my_write_func);
+
+	curl_easy_setopt(easy_handle, CURLOPT_NOPROGRESS, 0L);
+
+    progressstruct.curl = easy_handle;
+    progressstruct.lasttime = 0;
+
+    if(xferinfo_callback == NULL)
+    {
+
+        curl_easy_setopt(easy_handle, CURLOPT_XFERINFOFUNCTION, my_xferinfo_func);
+        curl_easy_setopt(easy_handle, CURLOPT_XFERINFODATA, &progressstruct);
+    }
+    else
+    {
+        curl_easy_setopt(easy_handle, CURLOPT_XFERINFOFUNCTION, xferinfo_callback);
+        if(xinfer_data != NULL)
+            curl_easy_setopt(easy_handle, CURLOPT_XFERINFODATA, xinfer_data);
+
+    }
+
+	curl_easy_setopt(easy_handle, CURLOPT_VERBOSE, 1L);
+
+	res = curl_easy_perform(easy_handle);
+
+	if(res == CURLM_OK)
+    {
+        fprintf(stderr, "\nÊÄªÁî®Êó∂: %f, \n", progressstruct.lasttime);
+        fprintf(stderr,"Â∑≤‰∏ãËΩΩ %d, ÊÄªÂ§ßÂ∞è %d , Âπ≥ÂùáÈÄüÂ∫¶ %.2fBytes/s, ËøõÂ∫¶ 100%%\n",\
+                filesize, filesize, filesize/progressstruct.lasttime);
+    }
+
+    if (fp != NULL)
 	{
-		_LOG("im_curl_clean fail\n");
-		return -1;
+		fclose(fp);
+		fp = NULL;
 	}
 
-	return 0;
+	curl_easy_cleanup(easy_handle);
+    easy_handle = NULL;
+
+	return res;
 }
