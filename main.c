@@ -2,19 +2,24 @@
 #include <stdlib.h>
 #include "_LOG.h"
 #include "sqm_curl.h"
+#include <pthread.h>
 
 #define NUMTHREAD 4
 
 struct downloadargs{
 	char* requestURL;
-	char saveto[125];
+	char saveto[256];
 	char* user;
 	char* password;
 	pfunc_xferinfo xferinfo_callback;
 	void* xferinfo_data;
+	pthread_mutex_t* plock;
 };
 
 void* pull_one_url(void* data);
+
+pthread_mutex_t lock;
+
 
 const char* const urls[ NUMTHREAD ]={
 	"http://10.165.92.189:6060/HTTPDIR/codeblocks.rar",
@@ -58,8 +63,9 @@ int main(int argc, char* argv[])
      //   printf("usage: cmd url [path]\n");
      //  return -1;
     //}
-	
-	
+	pthread_mutex_init(&lock,NULL);
+
+
 	pthread_t tid[NUMTHREAD];
 	int i;
 	int error;
@@ -72,6 +78,7 @@ int main(int argc, char* argv[])
 		args[i].password = "123456";
 		args[i].xferinfo_callback = NULL;
 		args[i].xferinfo_data = NULL;
+		args[i].plock = &lock;
 	}
 
 	sqm_curl_init();//global init;
@@ -87,13 +94,15 @@ int main(int argc, char* argv[])
 			else
 				fprintf(stderr, "Thread %d, gets %s\n", i, urls[i]);
 		}
-	for(i = 0; i< NUMTHREAD; i++) 
+	for(i = 0; i< NUMTHREAD; i++)
 	{
     	error = pthread_join(tid[i], NULL);
     	fprintf(stderr, "Thread %d terminated\n", i);
 	}
-    
+
     sqm_curl_clean();//global cleanup
+		pthread_mutex_destroy(&lock);
+
     return 0;
 }
 
@@ -102,11 +111,11 @@ void* pull_one_url(void* data)
 {
 	struct downloadargs* args=(struct downloadargs*) data;
 
-	_LOG("%S",args->requestURL);
+	//_LOG("%S",args->requestURL);
 
-	
+
 	//_LOG("%S",args->saveto);
 	sqm_filedownload(args->requestURL,args->saveto,args->user,\
-			args->password,args->xferinfo_callback,args->xferinfo_data);
+		args->password,args->xferinfo_callback,args->xferinfo_data,args->plock);
 
 }
