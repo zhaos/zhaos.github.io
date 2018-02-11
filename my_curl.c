@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 
 
+
 static size_t my_write_func(void *ptr, size_t size, size_t nmemb, void *stream)
 {
   return fwrite(ptr, size, nmemb, (FILE*)stream);
@@ -53,6 +54,17 @@ static int my_xferinfo_func(void *clientp,
     return 0;
 }
 
+static int older_progress(void *p,
+                  double dltotal, double dlnow,
+                  double ultotal, double ulnow)
+                  {
+                    return my_xferinfo_func(p,
+                    (curl_off_t)dltotal,
+                    (curl_off_t)dlnow,
+                    (curl_off_t)ultotal,
+                    (curl_off_t)ulnow);
+                  }
+
 static int get_localsize(const char* localpath)
 {
     struct stat file_info;
@@ -87,7 +99,8 @@ void sqm_curl_clean(void)
 
 int sqm_filedownload(const char *requestURL, const char *saveto, \
                      const char *user, const char *pwd, \
-                     pfunc_xferinfo xferinfo_callback, void* xinfer_data)
+                     pfunc_xferinfo xferinfo_callback, void* xinfer_data,\
+                   pthread_mutex_t *plock)
 {
 	CURLcode res;
 
@@ -116,9 +129,9 @@ int sqm_filedownload(const char *requestURL, const char *saveto, \
             //_LOG("%s", saveto);
         strcpy(filepath, saveto);
     }
-
+pthread_mutex_lock(plock);
     fp = fopen(filepath, "ab+");
-
+pthread_mutex_unlock(plock);
 	if (fp == NULL)
 	{
 		_LOG("open file \"%s\" fail", filepath);
@@ -168,16 +181,35 @@ int sqm_filedownload(const char *requestURL, const char *saveto, \
     if(xferinfo_callback == NULL)
     {
 
+        curl_easy_setopt(easy_handle, CURLOPT_PROGRESSFUNCTION, older_progress);
+        curl_easy_setopt(easy_handle, CURLOPT_PROGRESSDATA, &progressstruct);
+    }
+    else
+    {
+
+        curl_easy_setopt(easy_handle, CURLOPT_PROGRESSFUNCTION, older_progress);
+        if(xinfer_data != NULL)
+            curl_easy_setopt(easy_handle, CURLOPT_PROGRESSDATA, xinfer_data);
+    }
+
+#if LIBCURL_VERSION_NUM >= 0x072000
+    if(xferinfo_callback == NULL)
+    {
+
         curl_easy_setopt(easy_handle, CURLOPT_XFERINFOFUNCTION, my_xferinfo_func);
         curl_easy_setopt(easy_handle, CURLOPT_XFERINFODATA, &progressstruct);
     }
     else
     {
+
         curl_easy_setopt(easy_handle, CURLOPT_XFERINFOFUNCTION, xferinfo_callback);
         if(xinfer_data != NULL)
             curl_easy_setopt(easy_handle, CURLOPT_XFERINFODATA, xinfer_data);
-
     }
+
+    #endif
+
+
 
 	curl_easy_setopt(easy_handle, CURLOPT_VERBOSE, 1L);
 
