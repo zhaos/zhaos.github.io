@@ -1,8 +1,11 @@
 CC = gcc
 AR = ar
-CFLAGS = -g -DCURL_STATICLIB
-LDFLAGS = -L./ -lcurl -lrt
+CFLAGS = -g -Wall #-DCURL_STATICLIB
+LDFLAGS = -L./ -lcurl -lrt -lpthread
 INCLUDE :=
+
+ROOTDIR:= $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
+DIR := $(notdir $(patsubst %/,%,$(dir $(ROOTDIR))))
 
 PROGRAM := mycurl
 
