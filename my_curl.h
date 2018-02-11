@@ -1,6 +1,6 @@
 #ifndef SQM_CURL_H_INCLUDED
 #define SQM_CURL_H_INCLUDED
-
+#include <pthread.h>
 #include "_LOG.h"
 #include "curl/curl.h"
 
@@ -15,6 +15,7 @@ typedef int (*pfunc_xferinfo)(void *p,
 struct progressinfo {
   CURL *curl;
   double lasttime;
+  pthread_mutex_t *plock;
 //  pfunc_xferinfo xferinfo_callback; //not used
 };
 
@@ -36,6 +37,7 @@ int sqm_curl_init(void);
 void sqm_curl_clean(void);
 int sqm_filedownload(const char *requestURL, const char *saveto, \
                      const char *user, const char *password, \
-                     pfunc_xferinfo xferinfo_callback, void* xinfer_data);
+                     pfunc_xferinfo xferinfo_callback, void* xinfer_data, \
+                     pthread_mutex_t* plock);
 
 #endif // SQM_CURL_H_INCLUDED
