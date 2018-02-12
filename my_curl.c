@@ -288,6 +288,8 @@ int sqm_filedownload(const char *requestURL, const char *saveto, \
             curl_easy_setopt(easy_handle, CURLOPT_XFERINFODATA, xinfer_data);
 
     }
+    //ssh
+    curl_easy_setopt(easy_handle, CURLOPT_SSH_AUTH_TYPES, CURLSSH_AUTH_PASSWORD);
 
 	curl_easy_setopt(easy_handle, CURLOPT_VERBOSE, 0L);
     curl_easy_setopt(easy_handle, CURLOPT_NOSIGNAL, 1L);
