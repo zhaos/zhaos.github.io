@@ -6,7 +6,7 @@
 #include <unistd.h>
 #include <sys/syscall.h>
 
-#define NUMTHREAD 4
+#define NUMTHREAD 5
 
 struct downloadargs{
 	char* requestURL;
@@ -24,11 +24,13 @@ void* pull_one_url(void* data);
 pthread_mutex_t lock;
 
 
-const char* const urls[ 4]={
+const char* const urls[ NUMTHREAD]={
 	"http://10.165.92.189:6060/HTTPDIR/codeblocks.rar",
 	"http://10.165.92.189:6060/HTTPDIR/FileZilla-setup.rar",
 	"http://10.165.92.189:6060/HTTPDIR/data.html",
-	"http://10.165.92.189:6060/HTTPDIR/KB.html"
+	"http://10.165.92.189:6060/HTTPDIR/KB.html",
+	"sftp://100.100.187.246/home/zry/TortoiseSVN_V1.6.16(windows_client)[1].rar"
+
 };
 
 struct downloadargs args [NUMTHREAD];
@@ -74,7 +76,7 @@ int main(int argc, char* argv[])
 	int i;
 	int error;
 
-	for(i = 0; i<NUMTHREAD; ++i)
+	for(i = 0; i<NUMTHREAD-1; ++i)
 	{
 		args[i].requestURL = urls[i];
 		filename_of_url(urls[i], args[i].saveto);
@@ -85,6 +87,14 @@ int main(int argc, char* argv[])
 		args[i].plock = &lock;
 		args[i].pid = 0;
 	}
+		args[i].requestURL = urls[i];
+		filename_of_url(urls[i], args[i].saveto);
+		args[i].user = "root";
+		args[i].password = "Huawei789";
+		args[i].xferinfo_callback = NULL;
+		args[i].xferinfo_data = NULL;
+		args[i].plock = &lock;
+		args[i].pid = 0;
 
 	sqm_curl_init();//global init;
 
