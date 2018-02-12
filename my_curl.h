@@ -20,15 +20,15 @@ struct progressinfo {
 };
 
 
-/** \brief CURL_GLOBAL_ALL
+/** \brief ȫ�ֳ�ʼ�� ����CURL_GLOBAL_ALL
  *
  * \param void
  * \return int
- *  CURL_OK
+ * �ɹ�CURL_OK
  */
 int sqm_curl_init(void);
 
-/** \brief GlOBAL CLEAN UP
+/** \brief ȫ�����
  *
  * \param void
  * \return void
