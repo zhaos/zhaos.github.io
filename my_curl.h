@@ -16,19 +16,19 @@ struct progressinfo {
   CURL *curl;
   double lasttime;
   pthread_mutex_t *plock;
-//  pfunc_xferinfo xferinfo_callback; //not used
+  int pid;
 };
 
 
-/** \brief ȫ�ֳ�ʼ�� ����CURL_GLOBAL_ALL
+/** \brief CURL_GLOBAL_ALL
  *
  * \param void
  * \return int
- * �ɹ�CURL_OK
+ *  CURL_OK
  */
 int sqm_curl_init(void);
 
-/** \brief ȫ�����
+/** \brief GlOBAL CLEAN UP
  *
  * \param void
  * \return void
@@ -37,7 +37,7 @@ int sqm_curl_init(void);
 void sqm_curl_clean(void);
 int sqm_filedownload(const char *requestURL, const char *saveto, \
                      const char *user, const char *password, \
-                     pfunc_xferinfo xferinfo_callback, void* xinfer_data, \
-                     pthread_mutex_t* plock);
+                     pfunc_xferinfo xferinfo_callback, void* xinfer_data,\
+                     pthread_mutex_t* plock, int pid);
 
 #endif // SQM_CURL_H_INCLUDED
